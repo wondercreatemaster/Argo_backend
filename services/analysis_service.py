@@ -10,7 +10,7 @@ def _format_recent(contact: Contact, max_messages: int) -> str:
     lines = []
     for m in msgs:
         cleaned = m.text.replace("\n", " ").strip()
-        lines.append(f"{m.direction.upper()}: {cleaned}")
+        lines.append(f"{m.role.upper()}: {cleaned}")
     return "\n".join(lines)
 
 

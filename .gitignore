@@ -1,2 +1,5 @@
 .env
-./chroma_store
+chroma_store/
+__pycache__/
+**/__pycache__/
+data/

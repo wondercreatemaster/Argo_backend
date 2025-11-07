@@ -79,6 +79,38 @@ def chat_complete(
         print("❌ OpenAI chat_complete error:", e)
         raise
 
+def chat_complete_stream(
+    messages: list[dict],
+    model: str = "gpt-4o-mini",
+    system: str | None = None
+):
+    """
+    Generator that yields chunks of the model's reply as they're generated (streaming).
+    Also yields the full accumulated text for each chunk.
+    Yields: (chunk: str, full_text: str)
+    If `system` is provided, prepends it as a system message.
+    """
+    client = openai_client()
+    try:
+        if system:
+            messages = [{"role": "system", "content": system}] + messages
+        
+        stream = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=True,
+        )
+        
+        full_text = ""
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                content = chunk.choices[0].delta.content
+                full_text += content
+                yield content, full_text
+    except Exception as e:
+        print("❌ OpenAI chat_complete_stream error:", e)
+        raise
+
 
 def chat_json(
     messages: list[dict] | str,

@@ -2,9 +2,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class Message(BaseModel):
-    ts: str
-    direction: str  # "in" or "out"
+    timestamp: str
+    role: str  # "in" or "out"
     text: str
+    sender: str
 
 class Contact(BaseModel):
     contact_id: str
