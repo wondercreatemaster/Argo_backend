@@ -1,12 +1,26 @@
 import os
 import sqlite3
+import logging
 from datetime import datetime
 from typing import List, Dict, Any
 
-DB_PATH = os.path.expanduser("~/Desktop/chat.db")
+logger = logging.getLogger(__name__)
+
+# Make DB path configurable via environment variable
+DEFAULT_DB_PATH = os.path.expanduser("~/Desktop/chat.db")
+DB_PATH = os.getenv("CHAT_DB_PATH", DEFAULT_DB_PATH)
 
 def connect():
-    return sqlite3.connect(DB_PATH)
+    """Connect to the chat database with error handling."""
+    if not os.path.exists(DB_PATH):
+        error_msg = f"Chat database not found at {DB_PATH}. Please set CHAT_DB_PATH environment variable or ensure the file exists."
+        logger.error(error_msg)
+        raise FileNotFoundError(error_msg)
+    try:
+        return sqlite3.connect(DB_PATH)
+    except sqlite3.Error as e:
+        logger.error(f"Failed to connect to chat database at {DB_PATH}: {e}")
+        raise
 
 def apple_to_iso(apple_time):
     """Convert Apple's timestamp to ISO UTC string."""
@@ -22,8 +36,15 @@ def list_contacts(limit: int = 100) -> List[Dict]:
     """
     Returns list of chat threads with their last message snippet.
     """
-    conn = connect()
-    cur = conn.cursor()
+    try:
+        conn = connect()
+        cur = conn.cursor()
+    except FileNotFoundError:
+        logger.warning(f"Chat database not available at {DB_PATH}. Returning empty list.")
+        return []
+    except Exception as e:
+        logger.error(f"Error connecting to chat database: {e}")
+        raise
 
     if limit:
         query = """
@@ -83,8 +104,15 @@ def list_all_contacts() -> List[Dict]:
 
 def get_conversation(chat_id: int) -> Dict[str, Any]:
     """Return all messages and metadata for one chat thread."""
-    conn = connect()
-    cur = conn.cursor()
+    try:
+        conn = connect()
+        cur = conn.cursor()
+    except FileNotFoundError as e:
+        logger.error(f"Chat database not available: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error connecting to chat database: {e}")
+        raise
 
     # Get display name (chat name or handle)
     cur.execute("""

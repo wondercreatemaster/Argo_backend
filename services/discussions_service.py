@@ -1,4 +1,5 @@
 # services/discussions_service.py
+import logging
 from sqlmodel import select
 from services.models_db import Discussion, Message
 from services.rag_service import add_to_rag, query_rag
@@ -6,6 +7,20 @@ from services.rag_store import query_chat_history
 from services.openai_bridge import chat_complete, chat_complete_stream, embed_texts
 from db import get_session
 import uuid
+
+logger = logging.getLogger(__name__)
+
+# Context size limits to prevent oversized prompts
+MAX_CONTEXT_LENGTH = 8000  # Maximum characters for context
+MAX_DISCUSSION_CONTEXT_LENGTH = 3000  # Max for discussion context
+MAX_CHAT_HISTORY_CONTEXT_LENGTH = 5000  # Max for chat history context
+
+def _truncate_context(text: str, max_length: int) -> str:
+    """Truncate context text if it exceeds max_length, preserving the end."""
+    if len(text) <= max_length:
+        return text
+    # Keep the end of the context (most recent messages)
+    return "..." + text[-(max_length - 3):]
 
 def list_discussions():
     with get_session() as session:
@@ -58,7 +73,7 @@ def delete_discussion(discussion_id: str):
     try:
         delete_from_rag(discussion_id)
     except Exception as e:
-        print(f"⚠️ RAG cleanup failed: {e}")
+        logger.warning(f"RAG cleanup failed: {e}")
 
     return {"status": "ok", "id": discussion_id}
 
@@ -96,17 +111,28 @@ def chat_in_discussion(discussion_id: str, user_message: str):
                     history_lines.append(f"{doc}")
                 chat_history_context = "\n".join(history_lines)
         except Exception as e:
-            print(f"⚠️ Error retrieving chat history: {e}")
+            logger.warning(f"Error retrieving chat history: {e}")
             chat_history_context = ""
 
-        # Combine contexts
+        # Combine contexts with size limits
         context_parts = []
         if discussion_context:
-            context_parts.append(f"=== Discussion Context ===\n{discussion_context}")
+            truncated_discussion = _truncate_context(discussion_context, MAX_DISCUSSION_CONTEXT_LENGTH)
+            if len(discussion_context) > MAX_DISCUSSION_CONTEXT_LENGTH:
+                logger.debug(f"Truncated discussion context from {len(discussion_context)} to {len(truncated_discussion)} chars")
+            context_parts.append(f"=== Discussion Context ===\n{truncated_discussion}")
         if chat_history_context:
-            context_parts.append(f"=== Chat History Context (from iMessage) ===\n{chat_history_context}")
+            truncated_history = _truncate_context(chat_history_context, MAX_CHAT_HISTORY_CONTEXT_LENGTH)
+            if len(chat_history_context) > MAX_CHAT_HISTORY_CONTEXT_LENGTH:
+                logger.debug(f"Truncated chat history context from {len(chat_history_context)} to {len(truncated_history)} chars")
+            context_parts.append(f"=== Chat History Context (from iMessage) ===\n{truncated_history}")
         
         combined_context = "\n\n".join(context_parts) if context_parts else ""
+        
+        # Final safety check - truncate entire context if still too long
+        if len(combined_context) > MAX_CONTEXT_LENGTH:
+            logger.warning(f"Combined context exceeded {MAX_CONTEXT_LENGTH} chars, truncating")
+            combined_context = _truncate_context(combined_context, MAX_CONTEXT_LENGTH)
 
         # Generate AI reply
         system_prompt = (
@@ -170,17 +196,28 @@ def chat_in_discussion_stream(discussion_id: str, user_message: str):
                     history_lines.append(f"{doc}")
                 chat_history_context = "\n".join(history_lines)
         except Exception as e:
-            print(f"⚠️ Error retrieving chat history: {e}")
+            logger.warning(f"Error retrieving chat history: {e}")
             chat_history_context = ""
 
-        # Combine contexts
+        # Combine contexts with size limits
         context_parts = []
         if discussion_context:
-            context_parts.append(f"=== Discussion Context ===\n{discussion_context}")
+            truncated_discussion = _truncate_context(discussion_context, MAX_DISCUSSION_CONTEXT_LENGTH)
+            if len(discussion_context) > MAX_DISCUSSION_CONTEXT_LENGTH:
+                logger.debug(f"Truncated discussion context from {len(discussion_context)} to {len(truncated_discussion)} chars")
+            context_parts.append(f"=== Discussion Context ===\n{truncated_discussion}")
         if chat_history_context:
-            context_parts.append(f"=== Chat History Context (from iMessage) ===\n{chat_history_context}")
+            truncated_history = _truncate_context(chat_history_context, MAX_CHAT_HISTORY_CONTEXT_LENGTH)
+            if len(chat_history_context) > MAX_CHAT_HISTORY_CONTEXT_LENGTH:
+                logger.debug(f"Truncated chat history context from {len(chat_history_context)} to {len(truncated_history)} chars")
+            context_parts.append(f"=== Chat History Context (from iMessage) ===\n{truncated_history}")
         
         combined_context = "\n\n".join(context_parts) if context_parts else ""
+        
+        # Final safety check - truncate entire context if still too long
+        if len(combined_context) > MAX_CONTEXT_LENGTH:
+            logger.warning(f"Combined context exceeded {MAX_CONTEXT_LENGTH} chars, truncating")
+            combined_context = _truncate_context(combined_context, MAX_CONTEXT_LENGTH)
 
         # Generate AI reply with streaming
         system_prompt = (
@@ -212,4 +249,4 @@ def chat_in_discussion_stream(discussion_id: str, user_message: str):
                     session.commit()
                     add_to_rag(discussion_id, full_reply, "assistant")
                 except Exception as e:
-                    print(f"⚠️ Error saving assistant message: {e}")
+                    logger.error(f"Error saving assistant message: {e}")

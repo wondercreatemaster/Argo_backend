@@ -1,5 +1,9 @@
-import os, chromadb
+import os
+import logging
+import chromadb
 from chromadb.utils import embedding_functions
+
+logger = logging.getLogger(__name__)
 
 # We'll pass precomputed embeddings to Chroma; but also expose OpenAIEmbeddingFunction if you prefer.
 def get_chroma_client():
@@ -60,7 +64,7 @@ def query_chat_history(query_embedding: list[float], top_k: int = 10):
                 })
         return hits
     except Exception as e:
-        print(f"⚠️ Error querying chat history: {e}")
+        logger.error(f"Error querying chat history: {e}")
         return []
 
 def get_existing_message_ids() -> set:
@@ -85,14 +89,14 @@ def clear_all_messages():
             return len(all_results["ids"])
         return 0
     except Exception as e:
-        print(f"⚠️ Error clearing RAG: {e}")
+        logger.error(f"Error clearing RAG: {e}")
         # Try alternative: delete collection and recreate
         try:
             client = get_chroma_client()
             client.delete_collection("messages")
             return 0
         except Exception as e2:
-            print(f"⚠️ Error deleting collection: {e2}")
+            logger.error(f"Error deleting collection: {e2}")
             raise
 
 def has_indexed_messages() -> bool:

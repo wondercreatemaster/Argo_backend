@@ -1,10 +1,14 @@
 # services/rag_imessage_import.py
-import json, os
+import json
+import os
+import logging
 import hashlib
 from services.rag_service import add_to_rag
 from services.rag_store import add_messages, get_existing_message_ids, has_indexed_messages, clear_all_messages
 from services.openai_bridge import embed_texts
 from services import imessage_service as imsg
+
+logger = logging.getLogger(__name__)
 
 def normalize_msg(contact_id: str, ts: str, direction: str, text: str) -> str:
     """Format message for RAG storage."""
@@ -28,18 +32,18 @@ def import_imessage_history_from_db(batch_size: int = 128, incremental: bool = T
     
     This gives Argo memory of your real chat history.
     """
-    print("🔄 Starting import of iMessage history from chat.db...")
+    logger.info("Starting import of iMessage history from chat.db...")
     
     # Get existing message IDs if doing incremental import
     existing_ids = set()
     if incremental:
-        print("🔍 Checking for existing messages in RAG...")
+        logger.info("Checking for existing messages in RAG...")
         existing_ids = get_existing_message_ids()
-        print(f"📊 Found {len(existing_ids)} existing messages in RAG")
+        logger.info(f"Found {len(existing_ids)} existing messages in RAG")
     
     # Get all contacts (no limit)
     contacts = imsg.list_all_contacts()
-    print(f"📱 Found {len(contacts)} contacts")
+    logger.info(f"Found {len(contacts)} contacts")
     
     docs, ids, metas = [], [], []
     total_messages = 0
@@ -86,20 +90,20 @@ def import_imessage_history_from_db(batch_size: int = 128, incremental: bool = T
                 total_messages += 1
                 new_messages += 1
         except Exception as e:
-            print(f"⚠️ Error processing contact {contact_id}: {e}")
+            logger.warning(f"Error processing contact {contact_id}: {e}")
             continue
     
     if incremental:
-        print(f"📝 Found {new_messages} new messages to import (skipped {skipped_messages} existing)")
+        logger.info(f"Found {new_messages} new messages to import (skipped {skipped_messages} existing)")
     else:
-        print(f"📝 Processing {total_messages} messages for full import")
+        logger.info(f"Processing {total_messages} messages for full import")
     
     if new_messages == 0:
-        print("✅ No new messages to import. RAG is up to date.")
+        logger.info("No new messages to import. RAG is up to date.")
         return
     
     # Batch embed and add to RAG
-    print(f"📦 Embedding {new_messages} messages in batches of {batch_size}...")
+    logger.info(f"Embedding {new_messages} messages in batches of {batch_size}...")
     added_count = 0
     for i in range(0, len(docs), batch_size):
         chunk_docs = docs[i:i+batch_size]
@@ -111,12 +115,12 @@ def import_imessage_history_from_db(batch_size: int = 128, incremental: bool = T
             add_messages(chunk_docs, chunk_ids, chunk_metas, embs)
             added_count += len(chunk_docs)
             if added_count % (batch_size * 5) == 0:
-                print(f"  Progress: {added_count}/{new_messages} messages indexed...")
+                logger.info(f"Progress: {added_count}/{new_messages} messages indexed...")
         except Exception as e:
-            print(f"⚠️ Error processing batch {i//batch_size}: {e}")
+            logger.error(f"Error processing batch {i//batch_size}: {e}")
             continue
     
-    print(f"✅ Imported {added_count} iMessage messages into RAG from {len(contacts)} contacts.")
+    logger.info(f"Imported {added_count} iMessage messages into RAG from {len(contacts)} contacts.")
 
 def import_new_messages():
     """
@@ -128,15 +132,15 @@ def clear_and_reimport():
     """
     Clear all indexed messages from RAG and re-import everything from chat.db.
     """
-    print("🗑️ Clearing all indexed messages from RAG...")
+    logger.info("Clearing all indexed messages from RAG...")
     try:
         deleted_count = clear_all_messages()
-        print(f"✅ Cleared {deleted_count} messages from RAG")
+        logger.info(f"Cleared {deleted_count} messages from RAG")
     except Exception as e:
-        print(f"⚠️ Error clearing RAG: {e}")
+        logger.error(f"Error clearing RAG: {e}")
         raise
     
-    print("🔄 Starting full re-import...")
+    logger.info("Starting full re-import...")
     import_imessage_history_from_db(incremental=False)
 
 def import_imessage_history():

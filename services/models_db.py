@@ -18,3 +18,9 @@ class Message(SQLModel, table=True):
     text: str
     # Link to parent discussion (must use quoted name only)
     discussion: Optional["Discussion"] = Relationship(back_populates="messages")
+
+
+class UnreadState(SQLModel, table=True):
+    """Tracks the last seen message ID for each contact."""
+    contact_id: str = Field(primary_key=True)
+    last_seen_message_id: int

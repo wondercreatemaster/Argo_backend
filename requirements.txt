@@ -5,3 +5,4 @@ httpx
 openai
 chromadb
 pydantic
+sqlmodel

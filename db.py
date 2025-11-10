@@ -6,7 +6,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "data", "argo.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 
 def init_db():
-    from services.models_db import Discussion, Message  # import models here
+    from services.models_db import Discussion, Message, UnreadState  # import models here
     SQLModel.metadata.create_all(engine)
 
 def get_session():

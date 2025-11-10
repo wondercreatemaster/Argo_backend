@@ -1,12 +1,15 @@
 # services/openai_bridge.py
 import os
 import json
+import logging
 import httpx
 from openai import OpenAI
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def openai_client() -> OpenAI:
@@ -18,8 +21,8 @@ def openai_client() -> OpenAI:
     base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     proxy_url = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
 
-    print("🔹 OpenAI base URL:", base_url)
-    print("🔹 Proxy URL:", proxy_url or "(none)")
+    logger.debug(f"OpenAI base URL: {base_url}")
+    logger.debug(f"Proxy URL: {proxy_url or '(none)'}")
 
     # ---- Fix: older httpx compatibility ----
     if proxy_url:
@@ -47,7 +50,7 @@ def embed_texts(texts: list[str]):
         )
         return [item.embedding for item in res.data]
     except Exception as e:
-        print("❌ OpenAI embed_texts error:", e)
+        logger.error(f"OpenAI embed_texts error: {e}")
         raise
 
 
@@ -76,7 +79,7 @@ def chat_complete(
         )
         return res.choices[0].message.content
     except Exception as e:
-        print("❌ OpenAI chat_complete error:", e)
+        logger.error(f"OpenAI chat_complete error: {e}")
         raise
 
 def chat_complete_stream(
@@ -108,7 +111,7 @@ def chat_complete_stream(
                 full_text += content
                 yield content, full_text
     except Exception as e:
-        print("❌ OpenAI chat_complete_stream error:", e)
+        logger.error(f"OpenAI chat_complete_stream error: {e}")
         raise
 
 
@@ -140,5 +143,5 @@ def chat_json(
         import json
         return json.loads(res.choices[0].message.content)
     except Exception as e:
-        print("❌ OpenAI chat_json error:", e)
+        logger.error(f"OpenAI chat_json error: {e}")
         raise

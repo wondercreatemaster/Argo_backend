@@ -1,8 +1,11 @@
 # services/rag_service.py
 import os
+import logging
 import chromadb
 from chromadb.utils import embedding_functions
 from services.openai_bridge import embed_texts
+
+logger = logging.getLogger(__name__)
 
 CHROMA_PATH = "data/chroma"
 
@@ -41,7 +44,7 @@ def delete_from_rag(discussion_id: str):
         count_before = collection.count()
         collection.delete(where={"discussion": discussion_id})
         count_after = collection.count()
-        print(f"🗑️ Deleted RAG entries for discussion {discussion_id} "
-              f"({count_before - count_after} items removed).")
+        logger.info(f"Deleted RAG entries for discussion {discussion_id} "
+                    f"({count_before - count_after} items removed).")
     except Exception as e:
-        print(f"⚠️ Failed to delete RAG entries for {discussion_id}: {e}")
+        logger.warning(f"Failed to delete RAG entries for {discussion_id}: {e}")

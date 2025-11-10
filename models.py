@@ -28,3 +28,14 @@ class AnalysisResult(BaseModel):
     tone_summary: str
     facts: List[str]
     history_summary: str
+
+class UnreadMessage(BaseModel):
+    contact_id: str
+    display_name: str
+    message: str
+    timestamp: str
+    message_id: int
+
+class MarkReadRequest(BaseModel):
+    contact_id: str
+    message_id: int
